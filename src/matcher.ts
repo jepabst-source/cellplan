@@ -260,8 +260,31 @@ export function matchRooms(regions: Region[], program: RoomProgram): MatchResult
   }
 
   // Pass 2: All remaining rooms — best-fit by size
+  // Rooms with canShareWith can reuse another room's region (open concept)
   const otherRooms = enabledRooms.filter(r => !r.prefersGlass);
   for (const room of otherRooms) {
+    // First: check if this room can share a region with an already-matched room
+    if (room.canShareWith && room.canShareWith.length > 0) {
+      const sharedMatch = matches.find(m =>
+        m.region && room.canShareWith!.includes(m.room.name)
+      );
+      if (sharedMatch && sharedMatch.region) {
+        // Share the same region — kitchen sits in the living room's space
+        const dims = meetsDimensions(sharedMatch.region, room.minWidth, room.minDepth);
+        matches.push({
+          room,
+          region: sharedMatch.region,
+          meetsWidth: dims.meetsWidth,
+          meetsDepth: dims.meetsDepth,
+          hasCloset: !room.needsCloset,
+          closetRegion: null,
+          adjacencyMet: true, // sharing = adjacent by definition
+        });
+        continue;
+      }
+    }
+
+    // Otherwise: find a separate region
     const remaining = regions
       .map((r, i) => ({ region: r, index: i }))
       .filter(r => available.has(r.index));

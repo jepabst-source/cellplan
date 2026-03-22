@@ -110,6 +110,87 @@ function randomWall(state: SearchState): WallMove | null {
 }
 
 /**
+ * Guided wall generation based on empirical floor plan analysis.
+ *
+ * 9 real 1BR layouts all follow the same wall hierarchy:
+ *   Wall 1: Vertical divider — full height, splits unit into 2 bays (35-65%)
+ *   Wall 2: Horizontal in one bay — separates glass room from services
+ *   Wall 3: Horizontal in other bay — same
+ *   Wall 4+: Subdivision walls — closets, bath partition, utility
+ *
+ * Each wall position is randomized within its structural role.
+ */
+function guidedWall(state: SearchState, wallIndex: number): WallMove | null {
+  const { xMin, xMax, yMin, yMax } = state.interiorBounds;
+  const interiorW = xMax - xMin + 1; // ~68 cells
+  const interiorD = yMax - yMin + 1; // ~92 cells
+
+  if (wallIndex === 0) {
+    // Wall 1: Primary vertical divider — creates two bays
+    // Position at 35-65% of width (randomized)
+    const minFrac = 0.35, maxFrac = 0.65;
+    const x = xMin + Math.floor(interiorW * (minFrac + Math.random() * (maxFrac - minFrac)));
+
+    // Full height, door somewhere in the middle
+    const wallLen = yMax - yMin + 1;
+    const doorPos = Math.floor(wallLen * (0.3 + Math.random() * 0.4)); // door in middle 40%
+
+    return {
+      orientation: 'vertical',
+      thickness: 1,
+      start: { x, y: yMin },
+      end: { x, y: yMax },
+      openings: [doorPos],
+      label: `V-divider at x=${x}`,
+    };
+  }
+
+  if (wallIndex === 1 || wallIndex === 2) {
+    // Wall 2-3: Horizontal walls within each bay
+    // Separates glass-side rooms (bedroom/living) from corridor-side services
+    // Position at 35-60% of depth from glass (glass rooms get the bigger portion)
+    const existingV = state.walls.filter(w => w.orientation === 'vertical');
+    if (existingV.length === 0) return randomWall(state);
+
+    const vWallX = existingV[0].start.x;
+
+    // Which bay? Wall 2 = left bay, Wall 3 = right bay (or randomize)
+    let startX: number, endX: number;
+    if (wallIndex === 1) {
+      // Left bay
+      startX = xMin;
+      endX = vWallX - 1;
+    } else {
+      // Right bay
+      startX = vWallX + 1;
+      endX = xMax;
+    }
+
+    if (endX - startX < 6) return randomWall(state);
+
+    // Y position: 35-60% of depth from glass (y=0 is glass)
+    const minDepthFrac = 0.35, maxDepthFrac = 0.60;
+    const y = yMin + Math.floor(interiorD * (minDepthFrac + Math.random() * (maxDepthFrac - minDepthFrac)));
+
+    const wallLen = endX - startX + 1;
+    const doorPos = Math.floor(Math.random() * Math.max(1, wallLen - 9));
+
+    return {
+      orientation: 'horizontal',
+      thickness: 1,
+      start: { x: startX, y },
+      end: { x: endX, y },
+      openings: [doorPos],
+      label: `H-bay${wallIndex} at y=${y}`,
+    };
+  }
+
+  // Wall 4+: Subdivision walls (closets, bath partition, etc.)
+  // Use random placement within existing structure
+  return randomWall(state);
+}
+
+/**
  * Try to place a random valid wall. Returns the move if successful, null if not.
  */
 function tryRandomWall(state: SearchState): WallMove | null {
@@ -159,6 +240,53 @@ function runTrial(state: SearchState, numWalls: number): { moves: WallMove[]; sc
 }
 
 /**
+ * Run a guided trial: use the wall hierarchy from real floor plans.
+ * First 3 walls follow the canonical pattern, rest are random.
+ */
+function runGuidedTrial(state: SearchState, numWalls: number): { moves: WallMove[]; score: number } {
+  const moves: WallMove[] = [];
+
+  for (let i = 0; i < numWalls; i++) {
+    // First 3 walls use guided placement, rest use random
+    const generator = i < 3
+      ? () => guidedWall(state, i)
+      : () => randomWall(state);
+
+    let move: WallMove | null = null;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const candidate = generator();
+      if (!candidate) continue;
+
+      const validation = validateWallMove(state.grid, candidate);
+      if (!validation.valid) continue;
+
+      const gapCheck = checkMinGap(state.grid, candidate);
+      if (!gapCheck.valid) continue;
+
+      const filled = placeWall(state.grid, candidate);
+      const connected = checkConnectivity(state.grid, state.entryX, state.entryY);
+
+      if (!connected) {
+        undoWall(state.grid, filled);
+        continue;
+      }
+
+      move = candidate;
+      break;
+    }
+
+    if (!move) continue;
+
+    // Wall was already placed in the validation loop above
+    state.walls.push(move);
+    moves.push(move);
+  }
+
+  const score = scoreProgramMatch(state);
+  return { moves, score };
+}
+
+/**
  * One search step for the Step button — place one random valid wall.
  */
 export function searchStep(state: SearchState): WallMove | null {
@@ -166,10 +294,11 @@ export function searchStep(state: SearchState): WallMove | null {
 }
 
 /**
- * Monte Carlo search: run many random trials, keep the best.
+ * Monte Carlo search: run many trials, keep the best.
+ * 70% guided trials (wall hierarchy from real floor plans) + 30% pure random.
  */
 export function runSearch(state: SearchState, maxSteps: number = 8): WallMove[] {
-  const TRIALS = 200;
+  const TRIALS = 300;
   let bestMoves: WallMove[] = [];
   let bestScore = -Infinity;
 
@@ -181,10 +310,16 @@ export function runSearch(state: SearchState, maxSteps: number = 8): WallMove[] 
     state.grid = cloneGrid(origGrid);
     state.walls = [...origWalls];
 
-    // Random number of walls per trial (vary between 4 and maxSteps)
-    const numWalls = 4 + Math.floor(Math.random() * (maxSteps - 3));
+    // Guided trials use 4-6 walls (3 structural + 1-3 subdivision)
+    // Random trials use 4-maxSteps walls
+    const useGuided = trial < TRIALS * 0.7;
+    const numWalls = useGuided
+      ? 4 + Math.floor(Math.random() * 3) // 4-6 walls
+      : 4 + Math.floor(Math.random() * (maxSteps - 3));
 
-    const result = runTrial(state, numWalls);
+    const result = useGuided
+      ? runGuidedTrial(state, numWalls)
+      : runTrial(state, numWalls);
 
     if (result.score > bestScore) {
       bestScore = result.score;

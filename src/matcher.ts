@@ -391,36 +391,41 @@ export function matchRooms(regions: Region[], program: RoomProgram): MatchResult
     const kitchenMatch = matches.find(m => m.room.name === 'Kitchen');
     const bathMatch = matches.find(m => m.room.name === 'Bathroom');
 
+    // Bay rules are tiebreakers only — applied when primary rooms meet dimensions.
+    // Without this gate, bay bonuses reward narrow slivers in the "right" position.
+    const livingOk = livingMatch?.region && livingMatch.meetsWidth && livingMatch.meetsDepth;
+    const bedroomOk = bedroomMatch?.region && bedroomMatch.meetsWidth && bedroomMatch.meetsDepth;
+
     // Rule 1: Living and Bedroom should be in DIFFERENT bays (side-by-side)
-    if (livingMatch?.region && bedroomMatch?.region &&
+    if (livingOk && bedroomOk &&
         livingMatch.region !== bedroomMatch.region) {
-      if (bayOf(livingMatch.region) !== bayOf(bedroomMatch.region)) {
-        score += 15;
+      if (bayOf(livingMatch.region!) !== bayOf(bedroomMatch.region!)) {
+        score += 10;
       } else {
-        score -= 15;
+        score -= 10;
       }
     }
 
     // Rule 2: Kitchen in the same bay as Living
-    if (kitchenMatch?.region && livingMatch?.region &&
+    if (livingOk && kitchenMatch?.region &&
         kitchenMatch.region !== livingMatch.region) {
-      if (bayOf(kitchenMatch.region) === bayOf(livingMatch.region)) {
-        score += 20;
+      if (bayOf(kitchenMatch.region) === bayOf(livingMatch.region!)) {
+        score += 10;
       } else {
-        score -= 20;
+        score -= 10;
       }
     }
 
     // Rule 3: Bathroom in the same bay as Bedroom
-    if (bathMatch?.region && bedroomMatch?.region) {
-      if (bayOf(bathMatch.region) === bayOf(bedroomMatch.region)) {
-        score += 20;
+    if (bedroomOk && bathMatch?.region) {
+      if (bayOf(bathMatch.region) === bayOf(bedroomMatch.region!)) {
+        score += 10;
       } else {
-        score -= 20;
+        score -= 10;
       }
     }
 
-    // Rule 4: Service rooms should NOT touch glass
+    // Rule 4: Service rooms should NOT touch glass (always applies — this is a hard constraint)
     const serviceRoomNames = new Set(['Kitchen', 'Bathroom', 'Laundry Closet', 'Utility Closet']);
     for (const m of matches) {
       if (!m.region || !serviceRoomNames.has(m.room.name)) continue;
@@ -436,11 +441,11 @@ export function matchRooms(regions: Region[], program: RoomProgram): MatchResult
     }
 
     // Rule 5: Bathroom should be adjacent to Bedroom specifically
-    if (bathMatch?.region && bedroomMatch?.region) {
-      if (isAdjacent(bathMatch.region, bedroomMatch.region)) {
-        score += 15;
+    if (bedroomOk && bathMatch?.region) {
+      if (isAdjacent(bathMatch.region, bedroomMatch.region!)) {
+        score += 10;
       } else {
-        score -= 10;
+        score -= 5;
       }
     }
   }

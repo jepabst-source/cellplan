@@ -11,6 +11,7 @@ import { SearchState, searchStep, runSearch } from './search';
 import { setupCanvas, render, renderLabels, RendererOptions, RoomLabel } from './renderer';
 import { RoomProgram, defaultOneBedProgram } from './program';
 import { findRegions, matchRooms, MatchResult } from './matcher';
+import { scoreAllReferences, ReferencePlan } from './references';
 
 let canvas: HTMLCanvasElement;
 let options: RendererOptions;
@@ -19,6 +20,8 @@ let state: SearchState;
 let wallHistory: WallMove[] = [];
 let program: RoomProgram;
 let lastMatch: MatchResult | null = null;
+let refResults: Array<{ plan: ReferencePlan; result: MatchResult }> = [];
+let refIndex = -1; // -1 = not viewing a reference
 
 function init(): void {
   canvas = document.getElementById('grid-canvas') as HTMLCanvasElement;
@@ -32,13 +35,25 @@ function init(): void {
 
   btnGenerate.addEventListener('click', () => {
     readProgramUI();
+    refIndex = -1;
+    updateRefNav();
     reset();
     state.program = program;
     const moves = runSearch(state, 8);
     wallHistory = moves;
     runMatcher();
     renderGrid();
-    updateInfo();
+
+    // Compare against reference baseline
+    if (refResults.length === 0) {
+      refResults = scoreAllReferences(program);
+    }
+    const bestRef = refResults.length > 0 ? refResults[0].result.score : 0;
+    const genScore = lastMatch?.score ?? 0;
+    const comparison = genScore >= bestRef
+      ? `Generated score ${genScore} >= best reference ${bestRef}`
+      : `Generated score ${genScore} < best reference ${bestRef} (${refResults[0]?.plan.name})`;
+    updateInfo(comparison);
     btnStep.disabled = true;
   });
 
@@ -57,10 +72,78 @@ function init(): void {
   });
 
   btnReset.addEventListener('click', () => {
+    refIndex = -1;
+    updateRefNav();
     reset();
     renderGrid();
     updateInfo();
   });
+
+  const btnRefs = document.getElementById('btn-refs') as HTMLButtonElement;
+  const btnRefPrev = document.getElementById('btn-ref-prev') as HTMLButtonElement;
+  const btnRefNext = document.getElementById('btn-ref-next') as HTMLButtonElement;
+
+  btnRefs.addEventListener('click', () => {
+    readProgramUI();
+    refResults = scoreAllReferences(program);
+    refIndex = 0;
+    loadReferencePlan(refIndex);
+  });
+
+  btnRefPrev.addEventListener('click', () => {
+    if (refResults.length === 0 || refIndex <= 0) return;
+    refIndex--;
+    loadReferencePlan(refIndex);
+  });
+
+  btnRefNext.addEventListener('click', () => {
+    if (refResults.length === 0 || refIndex >= refResults.length - 1) return;
+    refIndex++;
+    loadReferencePlan(refIndex);
+  });
+}
+
+function loadReferencePlan(idx: number): void {
+  const { plan, result } = refResults[idx];
+
+  // Rebuild grid with this plan's walls
+  unit = createOneBedroom();
+  state = {
+    grid: unit.grid,
+    entryX: unit.entryX,
+    entryY: unit.entryY,
+    walls: [],
+    interiorBounds: unit.interiorBounds,
+  };
+  for (const wall of plan.walls) {
+    placeWall(state.grid, wall);
+    state.walls.push(wall);
+  }
+  wallHistory = [...plan.walls];
+  lastMatch = result;
+
+  options = setupCanvas(canvas, unit.grid, { cellSize: 6, showGrid: true });
+  updateRoomStatus();
+  renderGrid();
+  updateInfo(`Reference: ${plan.name} — ${plan.description}`);
+  updateRefNav();
+}
+
+function updateRefNav(): void {
+  const label = document.getElementById('ref-label')!;
+  const btnPrev = document.getElementById('btn-ref-prev') as HTMLButtonElement;
+  const btnNext = document.getElementById('btn-ref-next') as HTMLButtonElement;
+
+  if (refIndex < 0 || refResults.length === 0) {
+    label.textContent = '';
+    btnPrev.disabled = true;
+    btnNext.disabled = true;
+    return;
+  }
+
+  label.textContent = `${refIndex + 1} / ${refResults.length}`;
+  btnPrev.disabled = refIndex <= 0;
+  btnNext.disabled = refIndex >= refResults.length - 1;
 }
 
 function cellsToFeetLabel(cells: number): string {

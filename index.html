@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CellPlan — 4" Cell Floor Plan Generator</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    h1 { font-size: 18px; font-weight: 500; margin-bottom: 4px; }
+    .subtitle { font-size: 13px; color: #888; margin-bottom: 16px; }
+    #controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    button {
+      background: #333;
+      color: #e0e0e0;
+      border: 1px solid #555;
+      padding: 6px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    button:hover { background: #444; }
+    button:disabled { opacity: 0.4; cursor: default; }
+    canvas {
+      border: 1px solid #333;
+      background: #111;
+    }
+    #info {
+      margin-top: 12px;
+      font-size: 13px;
+      color: #888;
+      max-width: 800px;
+    }
+    #info .step { margin-top: 6px; color: #aaa; }
+  </style>
+</head>
+<body>
+  <h1>CellPlan</h1>
+  <p class="subtitle">4-inch cell floor plan generator — walls first, rooms emerge</p>
+  <div id="controls">
+    <button id="btn-generate">Generate</button>
+    <button id="btn-step" disabled>Step</button>
+    <button id="btn-reset">Reset</button>
+  </div>
+  <canvas id="grid-canvas"></canvas>
+  <div id="info"></div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

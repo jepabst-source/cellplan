@@ -1,0 +1,15 @@
+{
+  "name": "cellplan",
+  "version": "0.1.0",
+  "description": "4-inch cell floor plan generator — walls first, rooms emerge",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "vite": "^5.4.0"
+  }
+}

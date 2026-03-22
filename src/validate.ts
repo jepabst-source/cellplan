@@ -17,7 +17,7 @@ import { WallMove, getWallLength, wallAnchored, getWallCells } from './walls';
 export const MIN_WALL_LENGTH = 7;
 export const DOOR_OPENING_WIDTH = 9;
 export const MIN_CIRCULATION_GAP = 10;
-export const MIN_CLOSET_GAP = 7;
+export const MIN_CLOSET_GAP = 6;
 
 export interface ValidationResult {
   valid: boolean;

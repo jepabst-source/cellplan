@@ -90,10 +90,20 @@ function buildProgramUI(): void {
       `;
     }
 
+    let shapeHTML = '';
+    if (room.shapeOption) {
+      shapeHTML = `
+        <select id="room-shape-${i}" style="background:#333;color:#e0e0e0;border:1px solid #555;border-radius:3px;font-size:11px;padding:1px 4px;">
+          <option value="rectangle" ${room.shapeOption === 'rectangle' ? 'selected' : ''}>rectangle</option>
+          <option value="square" ${room.shapeOption === 'square' ? 'selected' : ''}>square</option>
+        </select>
+      `;
+    }
+
     row.innerHTML = `
       <input type="checkbox" id="room-${i}" ${room.enabled ? 'checked' : ''}>
       <label for="room-${i}">${room.name}</label>
-      ${closetHTML}
+      ${closetHTML}${shapeHTML}
       <span class="min-label">min ${minW} x ${minD}</span>
       <span id="room-status-${i}" style="width:140px;text-align:right;font-size:11px;"></span>
     `;
@@ -110,6 +120,24 @@ function readProgramUI(): void {
       const sel = document.getElementById(`room-closet-${i}`) as HTMLSelectElement;
       if (sel) {
         program.rooms[i].closetType = sel.value as 'walk-in' | 'reach-in';
+      }
+    }
+
+    if (program.rooms[i].shapeOption !== undefined) {
+      const sel = document.getElementById(`room-shape-${i}`) as HTMLSelectElement;
+      if (sel) {
+        const shape = sel.value as 'rectangle' | 'square';
+        program.rooms[i].shapeOption = shape;
+        // Swap to alternate dimensions when shape changes
+        if (shape === 'square' && program.rooms[i].altMinWidth !== undefined) {
+          program.rooms[i].minWidth = program.rooms[i].altMinWidth!;
+          program.rooms[i].minDepth = program.rooms[i].altMinDepth!;
+        } else {
+          // Reset to defaults — need to get originals
+          const defaults = defaultOneBedProgram();
+          program.rooms[i].minWidth = defaults.rooms[i].minWidth;
+          program.rooms[i].minDepth = defaults.rooms[i].minDepth;
+        }
       }
     }
   }

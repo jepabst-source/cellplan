@@ -62,6 +62,12 @@ function init(): void {
   });
 }
 
+function cellsToFeetLabel(cells: number): string {
+  const feet = Math.floor(cells / 3);
+  const rem = (cells % 3) * 4;
+  return rem === 0 ? `${feet}'` : `${feet}'-${rem}"`;
+}
+
 function buildProgramUI(): void {
   const list = document.getElementById('room-list')!;
   list.innerHTML = '';
@@ -72,10 +78,12 @@ function buildProgramUI(): void {
     row.className = 'room-row';
     row.innerHTML = `
       <input type="checkbox" id="room-${i}" ${room.enabled ? 'checked' : ''}>
-      <label for="room-${i}">${room.name}</label>
-      <input type="number" id="room-area-${i}" value="${room.minArea}" min="0" step="10">
-      <span class="unit">sf min</span>
-      <span id="room-status-${i}" style="width:80px;text-align:right;font-size:11px;"></span>
+      <label for="room-${i}">${room.name}${room.needsCloset ? ' +closet' : ''}</label>
+      <input type="number" id="room-w-${i}" value="${room.minWidth}" min="0" step="3" title="min width (cells)">
+      <span class="unit">x</span>
+      <input type="number" id="room-d-${i}" value="${room.minDepth}" min="0" step="3" title="min depth (cells)">
+      <span class="unit">cells</span>
+      <span id="room-status-${i}" style="width:120px;text-align:right;font-size:11px;"></span>
     `;
     list.appendChild(row);
   }
@@ -84,21 +92,30 @@ function buildProgramUI(): void {
 function readProgramUI(): void {
   for (let i = 0; i < program.rooms.length; i++) {
     const cb = document.getElementById(`room-${i}`) as HTMLInputElement;
-    const area = document.getElementById(`room-area-${i}`) as HTMLInputElement;
+    const w = document.getElementById(`room-w-${i}`) as HTMLInputElement;
+    const d = document.getElementById(`room-d-${i}`) as HTMLInputElement;
     program.rooms[i].enabled = cb.checked;
-    program.rooms[i].minArea = parseInt(area.value) || 0;
+    program.rooms[i].minWidth = parseInt(w.value) || 0;
+    program.rooms[i].minDepth = parseInt(d.value) || 0;
   }
 }
 
 function runMatcher(): void {
-  const regions = findRegions(state.grid, state.interiorBounds);
+  const regions = findRegions(state.grid, state.interiorBounds, state.walls);
   readProgramUI();
   lastMatch = matchRooms(regions, program);
   updateRoomStatus();
 }
 
 function updateRoomStatus(): void {
-  if (!lastMatch) return;
+  if (!lastMatch) {
+    for (let i = 0; i < program.rooms.length; i++) {
+      const el = document.getElementById(`room-status-${i}`);
+      if (el) { el.textContent = ''; el.className = ''; }
+    }
+    return;
+  }
+
   for (let i = 0; i < program.rooms.length; i++) {
     const el = document.getElementById(`room-status-${i}`);
     if (!el) continue;
@@ -110,12 +127,24 @@ function updateRoomStatus(): void {
     } else if (!match.region) {
       el.textContent = 'missing';
       el.className = 'room-miss';
-    } else if (match.meetsArea) {
-      el.textContent = `${match.region.areaSF} sf`;
-      el.className = 'room-match';
     } else {
-      el.textContent = `${match.region.areaSF} sf (small)`;
-      el.className = 'room-miss';
+      const dimOk = match.meetsWidth && match.meetsDepth;
+      const closetOk = !match.room.needsCloset || match.hasCloset;
+      const adjOk = match.room.adjacentTo.length === 0 || match.adjacencyMet;
+      const size = `${match.region.width}x${match.region.depth}`;
+      const feet = `${cellsToFeetLabel(match.region.width)}x${cellsToFeetLabel(match.region.depth)}`;
+
+      if (dimOk && closetOk && adjOk) {
+        el.textContent = `${size} (${feet})`;
+        el.className = 'room-match';
+      } else {
+        let issues = [];
+        if (!dimOk) issues.push('small');
+        if (!closetOk) issues.push('no closet');
+        if (!adjOk) issues.push('not adjacent');
+        el.textContent = `${size} — ${issues.join(', ')}`;
+        el.className = 'room-miss';
+      }
     }
   }
 }
@@ -155,21 +184,35 @@ function updateInfo(message?: string): void {
 
   if (wallHistory.length > 0 && lastMatch) {
     html += ` | <strong>Score:</strong> ${lastMatch.score}`;
-    html += `<br><strong>Walls:</strong> ${wallHistory.length}`;
+    html += ` | <strong>Walls:</strong> ${wallHistory.length}`;
 
     // Show matched rooms
     html += `<br><br><strong>Matched Rooms:</strong>`;
     for (const m of lastMatch.matches) {
-      const status = !m.region ? 'not found' :
-        m.meetsArea ? `${m.region.areaSF} sf` : `${m.region.areaSF} sf (needs ${m.room.minArea})`;
-      const cls = (!m.region || !m.meetsArea) ? 'room-miss' : 'room-match';
-      html += `<div class="step"><span class="${cls}">${m.room.name}: ${status}</span></div>`;
+      if (!m.region) {
+        html += `<div class="step"><span class="room-miss">${m.room.name}: not found</span></div>`;
+        continue;
+      }
+      const dimOk = m.meetsWidth && m.meetsDepth;
+      const closetOk = !m.room.needsCloset || m.hasCloset;
+      const adjOk = m.room.adjacentTo.length === 0 || m.adjacencyMet;
+      const ok = dimOk && closetOk && adjOk;
+      const cls = ok ? 'room-match' : 'room-miss';
+      const size = `${m.region.areaSF} sf (${cellsToFeetLabel(m.region.width)} x ${cellsToFeetLabel(m.region.depth)})`;
+      let extra = '';
+      if (m.room.needsCloset) {
+        extra = m.hasCloset ? ' + closet' : ' — NO CLOSET';
+      }
+      if (m.room.adjacentTo.length > 0 && !adjOk) {
+        extra += ` — NOT ADJ TO ${m.room.adjacentTo.join(', ')}`;
+      }
+      html += `<div class="step"><span class="${cls}">${m.room.name}: ${size}${extra}</span></div>`;
     }
 
     if (lastMatch.unmatched.length > 0) {
-      html += `<br><strong>Unassigned regions:</strong> ${lastMatch.unmatched.length}`;
+      html += `<br><strong>Unassigned:</strong>`;
       for (const r of lastMatch.unmatched) {
-        html += `<div class="step">${r.areaSF} sf region</div>`;
+        html += `<div class="step">${r.areaSF} sf (${cellsToFeetLabel(r.width)} x ${cellsToFeetLabel(r.depth)})</div>`;
       }
     }
   }

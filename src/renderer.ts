@@ -9,6 +9,7 @@
  */
 
 import { Grid, CellType, getCell } from './grid';
+import { Region } from './matcher';
 
 const COLORS: Record<CellType, string> = {
   [CellType.Open]: '#1a1a1a',
@@ -118,4 +119,47 @@ export function render(canvas: HTMLCanvasElement, grid: Grid, options: RendererO
 
   ctx.fillStyle = '#8a7a6a';
   ctx.fillText('CORRIDOR (North)', padding + (grid.width * cellSize) / 2, padding - 8);
+}
+
+export interface RoomLabel {
+  name: string;
+  region: Region;
+  ok: boolean;  // true if room passes all checks
+}
+
+/**
+ * Draw room labels centered in each matched region.
+ */
+export function renderLabels(canvas: HTMLCanvasElement, grid: Grid, options: RendererOptions, labels: RoomLabel[]): void {
+  const ctx = canvas.getContext('2d')!;
+  const { cellSize, padding } = options;
+
+  for (const label of labels) {
+    const r = label.region;
+    // Center of the region in grid coords
+    const centerX = (r.xMin + r.xMax) / 2;
+    const centerY = (r.yMin + r.yMax) / 2;
+
+    // Convert to canvas coords (y is flipped: y=0 is bottom)
+    const drawX = padding + centerX * cellSize;
+    const drawY = padding + (grid.height - 1 - centerY) * cellSize;
+
+    // Background pill
+    ctx.font = 'bold 10px -apple-system, sans-serif';
+    const text = label.name;
+    const metrics = ctx.measureText(text);
+    const textW = metrics.width + 8;
+    const textH = 14;
+
+    ctx.fillStyle = label.ok ? 'rgba(40, 80, 40, 0.85)' : 'rgba(100, 30, 30, 0.85)';
+    ctx.beginPath();
+    ctx.roundRect(drawX - textW / 2, drawY - textH / 2, textW, textH, 3);
+    ctx.fill();
+
+    // Text
+    ctx.fillStyle = label.ok ? '#8f8' : '#f88';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, drawX, drawY);
+  }
 }

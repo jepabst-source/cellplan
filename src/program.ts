@@ -14,6 +14,9 @@ export interface RoomRequirement {
   prefersCorridor: boolean; // kept for data structure, not scored
   needsCloset: boolean;     // must have an adjacent closet-sized region
   closetType: 'none' | 'reach-in' | 'walk-in'; // user selects closet type
+  shapeOption?: 'rectangle' | 'square'; // for rooms with shape variants (e.g. bathroom)
+  altMinWidth?: number;     // alternate min width when shape changes
+  altMinDepth?: number;     // alternate min depth when shape changes
   adjacentTo: string[];     // must be adjacent to these rooms (by name), or share same region
 }
 
@@ -70,19 +73,22 @@ export function defaultOneBedProgram(): RoomProgram {
       {
         name: 'Bathroom',
         enabled: true,
-        minWidth: 17,          // 5'-8"
-        minDepth: 21,          // 7'-0"
+        minWidth: 16,          // 5'-4" (rectangle option)
+        minDepth: 26,          // 8'-8" (rectangle option)
         prefersGlass: false,
         prefersCorridor: false,
         needsCloset: false,
         closetType: 'none',
         adjacentTo: [],
+        shapeOption: 'rectangle',
+        altMinWidth: 25,       // 8'-4" (square option)
+        altMinDepth: 25,       // 8'-4" (square option)
       },
       {
         name: 'Entry/Closet',
         enabled: true,
-        minWidth: 9,           // 3'-0"
-        minDepth: 12,          // 4'-0"
+        minWidth: 6,           // 2'-0"
+        minDepth: 9,           // 3'-0"
         prefersGlass: false,
         prefersCorridor: false,
         needsCloset: false,

@@ -19,11 +19,12 @@ export interface UnitSetup {
   };
 }
 
-export function createOneBedroom(): UnitSetup {
+export function createOneBedroom(doorX?: number): UnitSetup {
   const width = feetToCells(24);   // 72
   const height = feetToCells(32);  // 96
   const grid = createGrid(width, height);
   const extWall = 2; // 2-cell exterior walls (8")
+  const doorWidth = 9; // 9-cell (3') door opening
 
   // South wall (glass) — bottom, y = 0..1
   for (let x = 0; x < width; x++) {
@@ -53,17 +54,19 @@ export function createOneBedroom(): UnitSetup {
     }
   }
 
-  // Entry door opening: 9-cell gap centered in north wall
-  const entryCenter = Math.floor(width / 2);
-  const entryStart = entryCenter - 4; // 9 cells wide
-  for (let x = entryStart; x < entryStart + 9; x++) {
+  // Entry door opening: 9-cell gap anywhere along the corridor wall
+  // doorX can be any valid x position; defaults to centered
+  const entryStart = doorX ?? Math.floor(width / 2) - Math.floor(doorWidth / 2);
+  // Clamp to stay within the interior (between the side walls)
+  const clampedStart = Math.max(extWall, Math.min(entryStart, width - extWall - doorWidth));
+  for (let x = clampedStart; x < clampedStart + doorWidth; x++) {
     for (let t = 0; t < extWall; t++) {
       setCell(grid, x, height - 1 - t, CellType.Open);
     }
   }
 
   // Entry point is center of the opening, at the inner edge of the north wall
-  const entryX = entryCenter;
+  const entryX = clampedStart + Math.floor(doorWidth / 2);
   const entryY = height - 1 - extWall; // just inside the corridor wall
 
   return {

@@ -8,7 +8,7 @@ import { cellsToFeet } from './grid';
 import { placeWall, WallMove } from './walls';
 import { createOneBedroom, UnitSetup } from './testcase';
 import { SearchState, searchStep, runSearch } from './search';
-import { setupCanvas, render, RendererOptions } from './renderer';
+import { setupCanvas, render, renderLabels, RendererOptions, RoomLabel } from './renderer';
 import { RoomProgram, defaultOneBedProgram } from './program';
 import { findRegions, matchRooms, MatchResult } from './matcher';
 
@@ -213,6 +213,22 @@ function reset(): void {
 
 function renderGrid(): void {
   render(canvas, state.grid, options);
+  // Draw room labels if we have match results
+  if (lastMatch) {
+    const labels: RoomLabel[] = [];
+    for (const m of lastMatch.matches) {
+      if (!m.region) continue;
+      const dimOk = m.meetsWidth && m.meetsDepth;
+      const closetOk = !m.room.needsCloset || m.hasCloset;
+      const adjOk = m.room.adjacentTo.length === 0 || m.adjacencyMet;
+      labels.push({
+        name: m.room.name,
+        region: m.region,
+        ok: dimOk && closetOk && adjOk,
+      });
+    }
+    renderLabels(canvas, state.grid, options, labels);
+  }
 }
 
 function updateInfo(message?: string): void {

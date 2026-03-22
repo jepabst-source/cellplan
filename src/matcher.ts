@@ -370,5 +370,80 @@ export function matchRooms(regions: Region[], program: RoomProgram): MatchResult
     score -= unmatched.length * 5;
   }
 
+  // ── Bay-based spatial rules ──────────────────────────────────
+  // Empirical analysis of 9 real 1BR floor plans shows universal patterns:
+  //   - Living and Bedroom split the glass wall into two "bays" (left/right)
+  //   - Kitchen is always in the Living bay (behind it, away from glass)
+  //   - Bathroom is always in the Bedroom bay (behind it, away from glass)
+  //   - Service rooms (kitchen, bath, laundry, utility) never touch glass
+
+  // Derive unit midpoint from all regions
+  if (regions.length >= 2) {
+    const allXMin = Math.min(...regions.map(r => r.xMin));
+    const allXMax = Math.max(...regions.map(r => r.xMax));
+    const unitMidX = (allXMin + allXMax) / 2;
+
+    const bayOf = (region: Region): 'left' | 'right' =>
+      (region.xMin + region.xMax) / 2 < unitMidX ? 'left' : 'right';
+
+    const livingMatch = matches.find(m => m.room.name === 'Living/Dining');
+    const bedroomMatch = matches.find(m => m.room.name === 'Bedroom');
+    const kitchenMatch = matches.find(m => m.room.name === 'Kitchen');
+    const bathMatch = matches.find(m => m.room.name === 'Bathroom');
+
+    // Rule 1: Living and Bedroom should be in DIFFERENT bays (side-by-side)
+    if (livingMatch?.region && bedroomMatch?.region &&
+        livingMatch.region !== bedroomMatch.region) {
+      if (bayOf(livingMatch.region) !== bayOf(bedroomMatch.region)) {
+        score += 15;
+      } else {
+        score -= 15;
+      }
+    }
+
+    // Rule 2: Kitchen in the same bay as Living
+    if (kitchenMatch?.region && livingMatch?.region &&
+        kitchenMatch.region !== livingMatch.region) {
+      if (bayOf(kitchenMatch.region) === bayOf(livingMatch.region)) {
+        score += 20;
+      } else {
+        score -= 20;
+      }
+    }
+
+    // Rule 3: Bathroom in the same bay as Bedroom
+    if (bathMatch?.region && bedroomMatch?.region) {
+      if (bayOf(bathMatch.region) === bayOf(bedroomMatch.region)) {
+        score += 20;
+      } else {
+        score -= 20;
+      }
+    }
+
+    // Rule 4: Service rooms should NOT touch glass
+    const serviceRoomNames = new Set(['Kitchen', 'Bathroom', 'Laundry Closet', 'Utility Closet']);
+    for (const m of matches) {
+      if (!m.region || !serviceRoomNames.has(m.room.name)) continue;
+      // Skip shared regions (e.g., open-concept kitchen sharing living's glass region)
+      if (m.room.canShareWith.length > 0) {
+        const sharedWith = matches.find(t =>
+          t.region === m.region && m.room.canShareWith.includes(t.room.name));
+        if (sharedWith) continue;
+      }
+      if (m.region.touchesGlass) {
+        score -= 15;
+      }
+    }
+
+    // Rule 5: Bathroom should be adjacent to Bedroom specifically
+    if (bathMatch?.region && bedroomMatch?.region) {
+      if (isAdjacent(bathMatch.region, bedroomMatch.region)) {
+        score += 15;
+      } else {
+        score -= 10;
+      }
+    }
+  }
+
   return { matches, unmatched, score };
 }

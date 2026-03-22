@@ -37,8 +37,8 @@ export function defaultOneBedProgram(): RoomProgram {
       {
         name: 'Living/Dining',
         enabled: true,
-        minWidth: 44,          // ~14'-8"
-        minDepth: 44,          // ~14'-8"
+        minWidth: 33,          // 11'-0"
+        minDepth: 33,          // 11'-0"
         prefersGlass: true,
         prefersCorridor: false,
         needsCloset: false,
@@ -48,8 +48,8 @@ export function defaultOneBedProgram(): RoomProgram {
       {
         name: 'Bedroom',
         enabled: true,
-        minWidth: 40,          // ~13'-4"
-        minDepth: 40,          // ~13'-4"
+        minWidth: 30,          // 10'-0"
+        minDepth: 30,          // 10'-0"
         prefersGlass: true,
         prefersCorridor: false,
         needsCloset: true,

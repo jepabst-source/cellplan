@@ -114,19 +114,23 @@ export function wallAnchored(grid: Grid, move: WallMove): boolean {
 }
 
 function isAnchored(grid: Grid, x: number, y: number, orientation: Orientation, thickness: number): boolean {
-  // At boundary?
-  if (x === 0 || x >= grid.width - thickness || y === 0 || y >= grid.height - thickness) return true;
+  // At or adjacent to boundary (within exterior wall thickness)?
+  const EXT = 2; // exterior wall thickness in cells
+  if (x <= EXT || x >= grid.width - 1 - EXT || y <= EXT || y >= grid.height - 1 - EXT) return true;
 
-  // Touching an existing wall?
+  // Touching an existing wall (at endpoint, adjacent, or perpendicular)?
   if (orientation === 'horizontal') {
-    // Check cells perpendicular to the wall direction at this endpoint
     for (let t = 0; t < thickness; t++) {
+      // Check the endpoint cell itself (T-connection into existing wall)
+      if (isWall(getCell(grid, x, y + t))) return true;
       // Check left and right of endpoint
       if (x > 0 && isWall(getCell(grid, x - 1, y + t))) return true;
       if (x < grid.width - 1 && isWall(getCell(grid, x + 1, y + t))) return true;
     }
   } else {
     for (let t = 0; t < thickness; t++) {
+      // Check the endpoint cell itself
+      if (isWall(getCell(grid, x + t, y))) return true;
       if (y > 0 && isWall(getCell(grid, x + t, y - 1))) return true;
       if (y < grid.height - 1 && isWall(getCell(grid, x + t, y + 1))) return true;
     }

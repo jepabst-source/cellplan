@@ -425,16 +425,10 @@ export function matchRooms(regions: Region[], program: RoomProgram): MatchResult
       }
     }
 
-    // Rule 4: Service rooms should NOT touch glass (always applies — this is a hard constraint)
+    // Rule 4: Service rooms should NOT touch glass
     const serviceRoomNames = new Set(['Kitchen', 'Bathroom', 'Laundry Closet', 'Utility Closet']);
     for (const m of matches) {
       if (!m.region || !serviceRoomNames.has(m.room.name)) continue;
-      // Skip shared regions (e.g., open-concept kitchen sharing living's glass region)
-      if (m.room.canShareWith.length > 0) {
-        const sharedWith = matches.find(t =>
-          t.region === m.region && m.room.canShareWith.includes(t.room.name));
-        if (sharedWith) continue;
-      }
       if (m.region.touchesGlass) {
         score -= 15;
       }
@@ -446,6 +440,20 @@ export function matchRooms(regions: Region[], program: RoomProgram): MatchResult
         score += 10;
       } else {
         score -= 5;
+      }
+    }
+
+    // Rule 6: Living + Kitchen combined space should be large
+    // From real plans, the living bay is typically 11'+ wide x 20'+ deep total
+    const COMBINED_MIN_SF = 200; // ~200 sq ft combined (11' x 18')
+    if (livingMatch?.region && kitchenMatch?.region &&
+        livingMatch.region !== kitchenMatch.region &&
+        isAdjacent(livingMatch.region, kitchenMatch.region)) {
+      const combinedSF = livingMatch.region.areaSF + kitchenMatch.region.areaSF;
+      if (combinedSF >= COMBINED_MIN_SF) {
+        score += 15;
+      } else {
+        score -= 10;
       }
     }
   }

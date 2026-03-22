@@ -19,6 +19,8 @@ export interface RoomRequirement {
   altMinDepth?: number;     // alternate min depth when shape changes
   adjacentTo: string[];     // must be adjacent to these rooms (by name), or share same region
   canShareWith: string[];   // can share same open region with these rooms (open concept)
+  sharedMinWidth?: number;  // when sharing, combined region must meet these minimums
+  sharedMinDepth?: number;
 }
 
 export interface ClosetSpec {
@@ -48,7 +50,7 @@ export function defaultOneBedProgram(): RoomProgram {
         needsCloset: false,
         closetType: 'none',
         adjacentTo: ['Kitchen'],
-        canShareWith: ['Kitchen'],  // open concept kitchen/living
+        canShareWith: [],
       },
       {
         name: 'Bedroom',
@@ -72,7 +74,7 @@ export function defaultOneBedProgram(): RoomProgram {
         needsCloset: false,
         closetType: 'none',
         adjacentTo: ['Living/Dining'],
-        canShareWith: ['Living/Dining'],  // open concept
+        canShareWith: [],
       },
       {
         name: 'Bathroom',

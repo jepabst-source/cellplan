@@ -77,14 +77,24 @@ function buildProgramUI(): void {
     const room = program.rooms[i];
     const minW = cellsToFeetLabel(Math.min(room.minWidth, room.minDepth));
     const minD = cellsToFeetLabel(Math.max(room.minWidth, room.minDepth));
-    const extras = [];
-    if (room.needsCloset) extras.push('+ closet');
     const row = document.createElement('div');
     row.className = 'room-row';
+
+    let closetHTML = '';
+    if (room.needsCloset) {
+      closetHTML = `
+        <select id="room-closet-${i}" style="background:#333;color:#e0e0e0;border:1px solid #555;border-radius:3px;font-size:11px;padding:1px 4px;">
+          <option value="walk-in" ${room.closetType === 'walk-in' ? 'selected' : ''}>walk-in closet</option>
+          <option value="reach-in" ${room.closetType === 'reach-in' ? 'selected' : ''}>reach-in closet</option>
+        </select>
+      `;
+    }
+
     row.innerHTML = `
       <input type="checkbox" id="room-${i}" ${room.enabled ? 'checked' : ''}>
       <label for="room-${i}">${room.name}</label>
-      <span class="min-label">min ${minW} x ${minD}${extras.length ? ' ' + extras.join(', ') : ''}</span>
+      ${closetHTML}
+      <span class="min-label">min ${minW} x ${minD}</span>
       <span id="room-status-${i}" style="width:140px;text-align:right;font-size:11px;"></span>
     `;
     list.appendChild(row);
@@ -95,6 +105,13 @@ function readProgramUI(): void {
   for (let i = 0; i < program.rooms.length; i++) {
     const cb = document.getElementById(`room-${i}`) as HTMLInputElement;
     program.rooms[i].enabled = cb.checked;
+
+    if (program.rooms[i].needsCloset) {
+      const sel = document.getElementById(`room-closet-${i}`) as HTMLSelectElement;
+      if (sel) {
+        program.rooms[i].closetType = sel.value as 'walk-in' | 'reach-in';
+      }
+    }
   }
 }
 

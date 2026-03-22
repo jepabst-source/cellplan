@@ -13,19 +13,26 @@ export interface RoomRequirement {
   prefersGlass: boolean;    // should touch the glass wall (south)
   prefersCorridor: boolean; // kept for data structure, not scored
   needsCloset: boolean;     // must have an adjacent closet-sized region
+  closetType: 'none' | 'reach-in' | 'walk-in'; // user selects closet type
   adjacentTo: string[];     // must be adjacent to these rooms (by name), or share same region
+}
+
+export interface ClosetSpec {
+  minWidth: number;   // cells — along the wall
+  minDepth: number;   // cells — perpendicular to wall
 }
 
 export interface RoomProgram {
   rooms: RoomRequirement[];
-  closetMinDepth: number;   // cells — minimum closet depth (default 6 = 2')
-  closetMinWidth: number;   // cells — minimum closet width (default 9 = 3')
+  // A bedroom closet can be either type:
+  walkInCloset: ClosetSpec;   // 16x16 cells (5'-4" x 5'-4")
+  reachInCloset: ClosetSpec;  // 9 wide x 6 deep (3'-0" x 2'-0")
 }
 
 export function defaultOneBedProgram(): RoomProgram {
   return {
-    closetMinDepth: 16,  // walk-in closet: 5'-4" min each direction
-    closetMinWidth: 16,  // walk-in closet: 5'-4" min each direction
+    walkInCloset: { minWidth: 16, minDepth: 16 },   // 5'-4" x 5'-4"
+    reachInCloset: { minWidth: 9, minDepth: 6 },     // 3'-0" x 2'-0"
     rooms: [
       {
         name: 'Living/Dining',
@@ -35,7 +42,8 @@ export function defaultOneBedProgram(): RoomProgram {
         prefersGlass: true,
         prefersCorridor: false,
         needsCloset: false,
-        adjacentTo: ['Kitchen'],  // living room must be adjacent to kitchen
+        closetType: 'none',
+        adjacentTo: ['Kitchen'],
       },
       {
         name: 'Bedroom',
@@ -44,7 +52,8 @@ export function defaultOneBedProgram(): RoomProgram {
         minDepth: 40,          // ~13'-4"
         prefersGlass: true,
         prefersCorridor: false,
-        needsCloset: true,     // bedrooms need a closet
+        needsCloset: true,
+        closetType: 'walk-in', // user can change to 'reach-in'
         adjacentTo: [],
       },
       {
@@ -53,9 +62,10 @@ export function defaultOneBedProgram(): RoomProgram {
         minWidth: 24,          // 8'-0"
         minDepth: 18,          // 6'-0"
         prefersGlass: false,
-        prefersCorridor: true,
+        prefersCorridor: false,
         needsCloset: false,
-        adjacentTo: ['Living/Dining'],  // kitchen must be adjacent to living room
+        closetType: 'none',
+        adjacentTo: ['Living/Dining'],
       },
       {
         name: 'Bathroom',
@@ -63,8 +73,9 @@ export function defaultOneBedProgram(): RoomProgram {
         minWidth: 17,          // 5'-8"
         minDepth: 21,          // 7'-0"
         prefersGlass: false,
-        prefersCorridor: true,
+        prefersCorridor: false,
         needsCloset: false,
+        closetType: 'none',
         adjacentTo: [],
       },
       {
@@ -73,8 +84,9 @@ export function defaultOneBedProgram(): RoomProgram {
         minWidth: 9,           // 3'-0"
         minDepth: 12,          // 4'-0"
         prefersGlass: false,
-        prefersCorridor: true,
+        prefersCorridor: false,
         needsCloset: false,
+        closetType: 'none',
         adjacentTo: [],
       },
       {
@@ -83,8 +95,9 @@ export function defaultOneBedProgram(): RoomProgram {
         minWidth: 9,           // 3'-0"
         minDepth: 9,           // 3'-0"
         prefersGlass: false,
-        prefersCorridor: true,
+        prefersCorridor: false,
         needsCloset: false,
+        closetType: 'none',
         adjacentTo: [],
       },
       {
@@ -93,8 +106,9 @@ export function defaultOneBedProgram(): RoomProgram {
         minWidth: 9,           // 3'-0"
         minDepth: 9,           // 3'-0"
         prefersGlass: false,
-        prefersCorridor: true,
+        prefersCorridor: false,
         needsCloset: false,
+        closetType: 'none',
         adjacentTo: [],
       },
     ],

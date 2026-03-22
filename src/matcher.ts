@@ -158,22 +158,24 @@ function findAdjacentCloset(
   roomRegion: Region,
   allRegions: Region[],
   available: Set<number>,
-  closetMinWidth: number,
-  closetMinDepth: number,
+  program: RoomProgram,
+  closetType: 'walk-in' | 'reach-in' | 'none',
 ): { found: boolean; index: number; region: Region | null } {
+  // Get the spec for the requested closet type
+  const spec = closetType === 'walk-in' ? program.walkInCloset : program.reachInCloset;
+  const reqShort = Math.min(spec.minWidth, spec.minDepth);
+  const reqLong = Math.max(spec.minWidth, spec.minDepth);
+
   for (let i = 0; i < allRegions.length; i++) {
     if (!available.has(i)) continue;
     const r = allRegions[i];
     const short = Math.min(r.width, r.depth);
     const long = Math.max(r.width, r.depth);
 
-    // Must meet closet minimum dimensions
-    if (short < closetMinDepth || long < closetMinWidth) continue;
+    if (short < reqShort || long < reqLong) continue;
+    if (!isAdjacent(roomRegion, r)) continue;
 
-    // Must be adjacent to the room (sharing a wall edge)
-    if (isAdjacent(roomRegion, r)) {
-      return { found: true, index: i, region: r };
-    }
+    return { found: true, index: i, region: r };
   }
   return { found: false, index: -1, region: null };
 }
@@ -235,7 +237,7 @@ export function matchRooms(regions: Region[], program: RoomProgram): MatchResult
       let hasCloset = !room.needsCloset; // true if not needed
       let closetRegion: Region | null = null;
       if (room.needsCloset) {
-        const closet = findAdjacentCloset(best.region, regions, available, program.closetMinWidth, program.closetMinDepth);
+        const closet = findAdjacentCloset(best.region, regions, available, program, room.closetType);
         hasCloset = closet.found;
         if (closet.found) {
           available.delete(closet.index);
@@ -257,45 +259,23 @@ export function matchRooms(regions: Region[], program: RoomProgram): MatchResult
     }
   }
 
-  // Pass 2: Corridor-preferring rooms — best-fit corridor-touching regions
-  const corridorRooms = enabledRooms.filter(r => r.prefersCorridor);
-  for (const room of corridorRooms) {
-    const candidates = regions
-      .map((r, i) => ({ region: r, index: i }))
-      .filter(r => available.has(r.index) && r.region.touchesCorridor)
-      .sort((a, b) => a.region.area - b.region.area); // smallest first for service rooms
-
-    // Prefer one that meets dimensions
-    const best = candidates.find(r => {
-      const d = meetsDimensions(r.region, room.minWidth, room.minDepth);
-      return d.meetsWidth && d.meetsDepth;
-    }) || candidates[0];
-
-    if (best) {
-      available.delete(best.index);
-      const dims = meetsDimensions(best.region, room.minWidth, room.minDepth);
-      matches.push({
-        room,
-        region: best.region,
-        meetsWidth: dims.meetsWidth,
-        meetsDepth: dims.meetsDepth,
-        hasCloset: !room.needsCloset,
-        closetRegion: null,
-        adjacencyMet: true, // checked after all rooms assigned
-      });
-    } else {
-      matches.push({ room, region: null, meetsWidth: false, meetsDepth: false, hasCloset: false, closetRegion: null, adjacencyMet: false });
-    }
-  }
-
-  // Pass 3: Any remaining rooms
-  const otherRooms = enabledRooms.filter(r => !r.prefersGlass && !r.prefersCorridor);
+  // Pass 2: All remaining rooms — best-fit by size
+  const otherRooms = enabledRooms.filter(r => !r.prefersGlass);
   for (const room of otherRooms) {
     const remaining = regions
       .map((r, i) => ({ region: r, index: i }))
       .filter(r => available.has(r.index));
-    if (remaining.length > 0) {
-      const best = remaining[0];
+
+    // Prefer region that meets dimensions; among those, prefer smallest (best fit)
+    const fitting = remaining
+      .filter(r => {
+        const d = meetsDimensions(r.region, room.minWidth, room.minDepth);
+        return d.meetsWidth && d.meetsDepth;
+      })
+      .sort((a, b) => a.region.area - b.region.area);
+
+    const best = fitting[0] || remaining[0];
+    if (best) {
       available.delete(best.index);
       const dims = meetsDimensions(best.region, room.minWidth, room.minDepth);
       matches.push({
@@ -351,7 +331,6 @@ export function matchRooms(regions: Region[], program: RoomProgram): MatchResult
 
     // Placement bonus
     if (m.room.prefersGlass && m.region.touchesGlass) score += 20;
-    if (m.room.prefersCorridor && m.region.touchesCorridor) score += 20;
 
     // Closet rule
     if (m.room.needsCloset) {

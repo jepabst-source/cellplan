@@ -33,7 +33,8 @@ function init(): void {
   btnGenerate.addEventListener('click', () => {
     readProgramUI();
     reset();
-    const moves = runSearch(state, 6);
+    state.program = program;
+    const moves = runSearch(state, 8);
     wallHistory = moves;
     runMatcher();
     renderGrid();
@@ -74,16 +75,27 @@ function buildProgramUI(): void {
 
   for (let i = 0; i < program.rooms.length; i++) {
     const room = program.rooms[i];
+    const minW = cellsToFeetLabel(Math.min(room.minWidth, room.minDepth));
+    const minD = cellsToFeetLabel(Math.max(room.minWidth, room.minDepth));
     const row = document.createElement('div');
     row.className = 'room-row';
+
+    let closetHTML = '';
+    if (room.needsCloset) {
+      closetHTML = `
+        <select id="room-closet-${i}" style="background:#333;color:#e0e0e0;border:1px solid #555;border-radius:3px;font-size:11px;padding:1px 4px;">
+          <option value="walk-in" ${room.closetType === 'walk-in' ? 'selected' : ''}>walk-in closet</option>
+          <option value="reach-in" ${room.closetType === 'reach-in' ? 'selected' : ''}>reach-in closet</option>
+        </select>
+      `;
+    }
+
     row.innerHTML = `
       <input type="checkbox" id="room-${i}" ${room.enabled ? 'checked' : ''}>
-      <label for="room-${i}">${room.name}${room.needsCloset ? ' +closet' : ''}</label>
-      <input type="number" id="room-w-${i}" value="${room.minWidth}" min="0" step="3" title="min width (cells)">
-      <span class="unit">x</span>
-      <input type="number" id="room-d-${i}" value="${room.minDepth}" min="0" step="3" title="min depth (cells)">
-      <span class="unit">cells</span>
-      <span id="room-status-${i}" style="width:120px;text-align:right;font-size:11px;"></span>
+      <label for="room-${i}">${room.name}</label>
+      ${closetHTML}
+      <span class="min-label">min ${minW} x ${minD}</span>
+      <span id="room-status-${i}" style="width:140px;text-align:right;font-size:11px;"></span>
     `;
     list.appendChild(row);
   }
@@ -92,11 +104,14 @@ function buildProgramUI(): void {
 function readProgramUI(): void {
   for (let i = 0; i < program.rooms.length; i++) {
     const cb = document.getElementById(`room-${i}`) as HTMLInputElement;
-    const w = document.getElementById(`room-w-${i}`) as HTMLInputElement;
-    const d = document.getElementById(`room-d-${i}`) as HTMLInputElement;
     program.rooms[i].enabled = cb.checked;
-    program.rooms[i].minWidth = parseInt(w.value) || 0;
-    program.rooms[i].minDepth = parseInt(d.value) || 0;
+
+    if (program.rooms[i].needsCloset) {
+      const sel = document.getElementById(`room-closet-${i}`) as HTMLSelectElement;
+      if (sel) {
+        program.rooms[i].closetType = sel.value as 'walk-in' | 'reach-in';
+      }
+    }
   }
 }
 
@@ -131,18 +146,17 @@ function updateRoomStatus(): void {
       const dimOk = match.meetsWidth && match.meetsDepth;
       const closetOk = !match.room.needsCloset || match.hasCloset;
       const adjOk = match.room.adjacentTo.length === 0 || match.adjacencyMet;
-      const size = `${match.region.width}x${match.region.depth}`;
-      const feet = `${cellsToFeetLabel(match.region.width)}x${cellsToFeetLabel(match.region.depth)}`;
+      const feet = `${cellsToFeetLabel(match.region.width)} x ${cellsToFeetLabel(match.region.depth)}`;
 
       if (dimOk && closetOk && adjOk) {
-        el.textContent = `${size} (${feet})`;
+        el.textContent = `${feet} (${match.region.areaSF} sf)`;
         el.className = 'room-match';
       } else {
         let issues = [];
         if (!dimOk) issues.push('small');
         if (!closetOk) issues.push('no closet');
-        if (!adjOk) issues.push('not adjacent');
-        el.textContent = `${size} — ${issues.join(', ')}`;
+        if (!adjOk) issues.push('not adj');
+        el.textContent = `${feet} — ${issues.join(', ')}`;
         el.className = 'room-miss';
       }
     }
@@ -198,7 +212,7 @@ function updateInfo(message?: string): void {
       const adjOk = m.room.adjacentTo.length === 0 || m.adjacencyMet;
       const ok = dimOk && closetOk && adjOk;
       const cls = ok ? 'room-match' : 'room-miss';
-      const size = `${m.region.areaSF} sf (${cellsToFeetLabel(m.region.width)} x ${cellsToFeetLabel(m.region.depth)})`;
+      const size = `${cellsToFeetLabel(m.region.width)} x ${cellsToFeetLabel(m.region.depth)} (${m.region.areaSF} sf)`;
       let extra = '';
       if (m.room.needsCloset) {
         extra = m.hasCloset ? ' + closet' : ' — NO CLOSET';
@@ -212,7 +226,7 @@ function updateInfo(message?: string): void {
     if (lastMatch.unmatched.length > 0) {
       html += `<br><strong>Unassigned:</strong>`;
       for (const r of lastMatch.unmatched) {
-        html += `<div class="step">${r.areaSF} sf (${cellsToFeetLabel(r.width)} x ${cellsToFeetLabel(r.depth)})</div>`;
+        html += `<div class="step">${cellsToFeetLabel(r.width)} x ${cellsToFeetLabel(r.depth)} (${r.areaSF} sf)</div>`;
       }
     }
   }

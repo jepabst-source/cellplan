@@ -33,7 +33,8 @@ function init(): void {
   btnGenerate.addEventListener('click', () => {
     readProgramUI();
     reset();
-    const moves = runSearch(state, 6);
+    state.program = program;
+    const moves = runSearch(state, 8);
     wallHistory = moves;
     runMatcher();
     renderGrid();

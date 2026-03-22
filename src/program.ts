@@ -11,7 +11,7 @@ export interface RoomRequirement {
   minWidth: number;         // cells — shortest dimension
   minDepth: number;         // cells — longest dimension
   prefersGlass: boolean;    // should touch the glass wall (south)
-  prefersCorridor: boolean; // should be near corridor (north)
+  prefersCorridor: boolean; // kept for data structure, not scored
   needsCloset: boolean;     // must have an adjacent closet-sized region
   adjacentTo: string[];     // must be adjacent to these rooms (by name), or share same region
 }

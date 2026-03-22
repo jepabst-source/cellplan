@@ -64,7 +64,7 @@ export function defaultOneBedProgram(): RoomProgram {
         enabled: true,
         minWidth: 24,          // 8'-0"
         minDepth: 18,          // 6'-0"
-        prefersGlass: false,
+        prefersGlass: true,    // gets glass if room (3rd priority after Living, Bedroom)
         prefersCorridor: false,
         needsCloset: false,
         closetType: 'none',

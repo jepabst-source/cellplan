@@ -56,6 +56,7 @@ export function generateCandidates(state: SearchState): WallMove[] {
 function generateVerticalSplits(_state: SearchState, xMin: number, xMax: number, yMin: number, yMax: number): WallMove[] {
   const moves: WallMove[] = [];
   const interiorWidth = xMax - xMin + 1;
+  const wallHeight = yMax - yMin + 1;
 
   // Try splitting at 12-foot increments (36 cells) and nearby positions
   const center = xMin + Math.floor(interiorWidth / 2);
@@ -64,20 +65,29 @@ function generateVerticalSplits(_state: SearchState, xMin: number, xMax: number,
     xMin + 36 - 1, xMin + 36, xMin + 36 + 1, // 12' from left
   ];
 
+  // Try door openings at multiple positions along the wall height
+  const doorPositions = [
+    Math.floor((wallHeight - 9) / 2),         // center
+    Math.floor((wallHeight - 9) * 0.3),       // 30% from glass
+    Math.floor((wallHeight - 9) * 0.7),       // 70% from glass
+  ];
+
   const seen = new Set<number>();
   for (const x of tryPositions) {
     if (x <= xMin + MIN_BAY || x >= xMax - MIN_BAY) continue;
     if (seen.has(x)) continue;
     seen.add(x);
 
-    moves.push({
-      orientation: 'vertical',
-      thickness: 1,
-      start: { x, y: yMin },
-      end: { x, y: yMax },
-      openings: [],
-      label: `Vertical split at x=${x} (${cellsToFeet(x - xMin)} from left wall)`,
-    });
+    for (const doorPos of doorPositions) {
+      moves.push({
+        orientation: 'vertical',
+        thickness: 1,
+        start: { x, y: yMin },
+        end: { x, y: yMax },
+        openings: [doorPos],
+        label: `Vertical split at x=${x} (${cellsToFeet(x - xMin)} from left), door at ${cellsToFeet(doorPos)}`,
+      });
+    }
   }
 
   return moves;
